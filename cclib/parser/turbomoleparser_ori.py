@@ -326,62 +326,18 @@ class Turbomole(logfileparser.Logfile):
         #     o        1     15      5   sto-3g hondo  [2s1p|6s3p]
         #     h        2      3      1   sto-3g hondo  [1s|3s]
         #    ---------------------------------------------------------------------------
-
-        # check "basis set information" to be sure it's not auxilary basis set
-        if "type   atoms  prim   cont   basis" in line and "basis set information" in \
-            self.last_lines[-6]:
+        if "type   atoms  prim   cont   basis" in line:
             line = next(inputfile)
             line = next(inputfile)
             basis_sets = []
-            atombasis_dict = {} 
-            nbasis = 0
             while set(line.strip()) != {"-"}:
                 basis_sets.append(" ".join(line.split()[4:-1]))
-                ele_type = line.split()[0]
-                ele_cont = int(line.split()[3])
-                nbasis += ele_cont*int(line.split()[1])
-                atombasis_dict[ele_type]=ele_cont
                 line = next(inputfile)
-            # need to convert atombasis a list atomic orbital indices 
-            if hasattr(self, 'atomnos') is True:
-                atombasis = []
-                nb = 0
-                nbb = 0
-                for i in range(len(self.atomnos)):
-                   ele = self.periodic_table.element[self.atomnos[i]]
-                   cont = atombasis_dict[ele.lower()]
-                   atombasis.append(list(range(nb,nb+cont)))
-                   nb += cont
-            self.set_attribute('atombasis', atombasis)
-            self.set_attribute('nbasis', nbasis)
-            self.nbasis = nbasis
+
             # Turbomole gives us the basis set for each atom, but we're only interested if the same basis set is used throughout (for now).
             if len(set(basis_sets)) == 1:
                 self.metadata["basis_set"] = list(set(basis_sets))[0]
-        # get overlap matrix
-        if "OVERLAP" in line: 
-            line = next(inputfile)
-            line = next(inputfile)
-            nelem = int(self.nbasis*(self.nbasis+1)/2)
-            overlaparray=[]
-            aooverlaps=numpy.zeros((self.nbasis,self.nbasis),"d")
-            l = 0
-            while line != "       ----------------------\n":
-                temp=line.split()
-                nfield=len(temp)
-                for i in range(nfield):
-                    l += 1
-                    overlaparray.append(float(temp[i]))
-                if(l == nelem): break
-                line = next(inputfile)
-            counter=0
-            for i in range(0, self.nbasis, 1):
-                for j in range(0, i+1, 1):
-                    aooverlaps[i][j]=overlaparray[counter]
-                    aooverlaps[j][i]=overlaparray[counter]
-                    counter=counter+1
-            self.set_attribute('aooverlaps', aooverlaps)
-
+                
         # Coordinates and gradients from statpt.
         #   *************************************************************************
         #  ATOM                      CARTESIAN COORDINATES
@@ -930,20 +886,6 @@ class Turbomole(logfileparser.Logfile):
         #       occ. orbital   energy / eV   virt. orbital     energy / eV   |coeff.|^2*100
         #         7 a   alpha          -15.12     12 a   alpha            4.74       24.5
         #         7 a   beta           -15.12     12 a   beta             4.74       24.5        
-        # metadata for RPA
-        if "RPA SINGLET-EXCITATION-CALCULATION" in line:
-            self.metadata['methods'].append("Restricted TD")
-        if "RPA UHF-EXCITATION-CALCULATION" in line:
-            self.metadata['methods'].append("Unrestricted TD")
-        # metadata for TPA
-        if "TWO-PHOTON ABSORPTION AMPLITUDES REQUESTED" in line:
-            self.metadata['methods'].append("QR-TPA")
-        # metadata for dft
-        if "density functional" in line and "------------------" in self.last_lines[-1]:
-            line = next(inputfile)
-            line = next(inputfile)
-            self.metadata['functional'] = line.split()[0].upper()
-
         if "Excitation energy:" in line and "excitation" in self.last_lines[-5].split():
             # The irrep of the state is a few lines back.
             symm_parts = self.last_lines[-5].split()
@@ -1045,7 +987,7 @@ class Turbomole(logfileparser.Logfile):
             tdm_z = float(line.split()[1])
             
             self.append_attribute("etdips", [tdm_x, tdm_y, tdm_z])
-
+            
         # Excitation energies with ricc2.
         #  +================================================================================+
         #  | sym | multi | state |          CC2 excitation energies       |  %t1   |  %t2   |

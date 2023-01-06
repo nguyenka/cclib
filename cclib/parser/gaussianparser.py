@@ -298,6 +298,13 @@ class Gaussian(logfileparser.Logfile):
         # Basis set name
         if line[1:15] == "Standard basis":
             self.metadata["basis_set"] = line.split()[2]
+        if line[1:14] == "Stoichiometry":
+            self.metadata["formula"] = line.split()[1]
+        if "td(" in line:
+            line1 = inputfile.next()
+            line2 = inputfile.next()
+            if "----------------" in line1 or "----------------" in line2:
+                self.metadata["methods"].append("TD")
 
         # Dipole moment
         # e.g. from G09
