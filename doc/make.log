@@ -1,0 +1,60 @@
+make
+/Library/Developer/CommandLineTools/usr/bin/make -C sphinx default
+Checking out prod...
+git clone https://github.com/cclib/cclib.git _build/cclib_prod
+Cloning into '_build/cclib_prod'...
+remote: Enumerating objects: 25130, done.
+remote: Counting objects: 100% (1965/1965), done.
+remote: Compressing objects: 100% (892/892), done.
+remote: Total 25130 (delta 1303), reused 1583 (delta 1073), pack-reused 23165
+Receiving objects: 100% (25130/25130), 60.07 MiB | 584.00 KiB/s, done.
+Resolving deltas: 100% (17004/17004), done.
+Updating files: 100% (1633/1633), done.
+cd _build/cclib_prod; git checkout v1.7.1
+Note: switching to 'v1.7.1'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 8517da92 Fix typo
+Checking out dev...
+git clone -b master https://github.com/cclib/cclib.git _build/cclib_dev
+Cloning into '_build/cclib_dev'...
+remote: Enumerating objects: 25130, done.
+remote: Counting objects: 100% (1965/1965), done.
+remote: Compressing objects: 100% (893/893), done.
+remote: Total 25130 (delta 1303), reused 1582 (delta 1072), pack-reused 23165
+Receiving objects: 100% (25130/25130), 60.07 MiB | 1.80 MiB/s, done.
+Resolving deltas: 100% (17004/17004), done.
+Updating files: 100% (1633/1633), done.
+Updating prod...
+cd _build/cclib_prod; git checkout v1.7.1; git fetch --all --tags
+HEAD is now at 8517da92 Fix typo
+Fetching origin
+cd _build/cclib_prod; find . -name "*.pyc" -delete
+Updating dev...
+cd _build/cclib_dev; git pull origin; git fetch --all --tags
+Already up to date.
+Fetching origin
+cd _build/cclib_dev; find . -name "*.pyc" -delete
+Generating prod attributes...
+rm -rf cclib
+ln -s _build/cclib_prod/cclib cclib
+python attributes.py > attributes.rst
+sed -i "/find cython becke routine/d" attributes.rst
+sed: 1: "attributes.rst": command a expects \ followed by text
+make[1]: *** [attributes.rst] Error 1
+make: *** [sphinx] Error 2
+

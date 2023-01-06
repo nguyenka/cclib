@@ -5,7 +5,6 @@
 # This file is part of cclib (http://cclib.github.io) and is distributed under
 # the terms of the BSD 3-Clause License.
 import collections
-import scipy.constants
 
 """Parser for Turbomole output files."""
 
@@ -50,7 +49,7 @@ class Turbomole(logfileparser.Logfile):
     """A Turbomole log file."""
 
     def __init__(self, *args, **kwargs):
-        super().__init__(logname="Turbomole", *args, **kwargs)
+        super(Turbomole, self).__init__(logname="Turbomole", *args, **kwargs)
         
         # Flag for whether this calc is DFT.
         self.is_DFT = False
@@ -63,11 +62,11 @@ class Turbomole(logfileparser.Logfile):
 
     def __str__(self):
         """Return a string representation of the object."""
-        return f"Turbomole output file {self.filename}"
+        return "Turbomole output file %s" % (self.filename)
 
     def __repr__(self):
         """Return a representation of the object."""
-        return f'Turbomole("{self.filename}")'
+        return 'Turbomole("%s")' % (self.filename)
 
     def normalisesym(self, label):
         """Normalise the symmetries used by Turbomole.
@@ -152,10 +151,8 @@ class Turbomole(logfileparser.Logfile):
             build_id = version_match.group(4)
                             
             self.metadata["legacy_package_version"] = version
-            self.metadata["package_version"] = (
-                f"{version}.r{build_id}" if build_id is not None else version
-            )
-
+            self.metadata["package_version"] = "{}.r{}".format(version, build_id) if build_id is not None else version
+                
             # We have entered a new module (sub program); reset our success flag.
             self.metadata['success'] = False
         
@@ -279,10 +276,8 @@ class Turbomole(logfileparser.Logfile):
                 
                 # Check we won't loose information converting to int.
                 if total_charge != total_charge_int:
-                    self.logger.warning(
-                        f"Converting non integer total charge '{total_charge}' to integer"
-                    )
-
+                    self.logger.warning("Converting non integer total charge '{}' to integer".format(total_charge))
+                
                 # Set regardless.
                 self.set_attribute("charge", total_charge_int)
 
@@ -331,62 +326,18 @@ class Turbomole(logfileparser.Logfile):
         #     o        1     15      5   sto-3g hondo  [2s1p|6s3p]
         #     h        2      3      1   sto-3g hondo  [1s|3s]
         #    ---------------------------------------------------------------------------
-
-        # check "basis set information" to be sure it's not auxilary basis set
-        if "type   atoms  prim   cont   basis" in line and "basis set information" in \
-            self.last_lines[-6]:
+        if "type   atoms  prim   cont   basis" in line:
             line = next(inputfile)
             line = next(inputfile)
             basis_sets = []
-            atombasis_dict = {} 
-            nbasis = 0
             while set(line.strip()) != {"-"}:
                 basis_sets.append(" ".join(line.split()[4:-1]))
-                ele_type = line.split()[0]
-                ele_cont = int(line.split()[3])
-                nbasis += ele_cont*int(line.split()[1])
-                atombasis_dict[ele_type]=ele_cont
                 line = next(inputfile)
-            # need to convert atombasis a list atomic orbital indices 
-            if hasattr(self, 'atomnos') is True:
-                atombasis = []
-                nb = 0
-                nbb = 0
-                for i in range(len(self.atomnos)):
-                   ele = self.periodic_table.element[self.atomnos[i]]
-                   cont = atombasis_dict[ele.lower()]
-                   atombasis.append(list(range(nb,nb+cont)))
-                   nb += cont
-            self.set_attribute('atombasis', atombasis)
-            self.set_attribute('nbasis', nbasis)
-            self.nbasis = nbasis
+
             # Turbomole gives us the basis set for each atom, but we're only interested if the same basis set is used throughout (for now).
             if len(set(basis_sets)) == 1:
                 self.metadata["basis_set"] = list(set(basis_sets))[0]
-        # get overlap matrix
-        if "OVERLAP" in line: 
-            line = next(inputfile)
-            line = next(inputfile)
-            nelem = int(self.nbasis*(self.nbasis+1)/2)
-            overlaparray=[]
-            aooverlaps=numpy.zeros((self.nbasis,self.nbasis),"d")
-            l = 0
-            while line != "       ----------------------\n":
-                temp=line.split()
-                nfield=len(temp)
-                for i in range(nfield):
-                    l += 1
-                    overlaparray.append(float(temp[i]))
-                if(l == nelem): break
-                line = next(inputfile)
-            counter=0
-            for i in range(0, self.nbasis, 1):
-                for j in range(0, i+1, 1):
-                    aooverlaps[i][j]=overlaparray[counter]
-                    aooverlaps[j][i]=overlaparray[counter]
-                    counter=counter+1
-            self.set_attribute('aooverlaps', aooverlaps)
-
+                
         # Coordinates and gradients from statpt.
         #   *************************************************************************
         #  ATOM                      CARTESIAN COORDINATES
@@ -855,13 +806,13 @@ class Turbomole(logfileparser.Logfile):
             
         # Look for MP energies.
         for mp_level in range(2,6):
-            if f"Final MP{mp_level} energy" in line:
+            if "Final MP{} energy".format(mp_level) in line:
                 mpenergy = utils.convertor(utils.float(line.split()[5]), 'hartree', 'eV')
                 if mp_level == 2:
                     self.append_attribute('mpenergies', [mpenergy])
                 else:
                     self.mpenergies[-1].append(mpenergy)
-                self.metadata["methods"].append(f"MP{mp_level}")
+                self.metadata['methods'].append("MP{}".format(mp_level))
 
         #  *****************************************************
         #  *                                                   *
@@ -884,14 +835,11 @@ class Turbomole(logfileparser.Logfile):
         #     Method          :  MP2     
         #     Total Energy    :    -75.0009789796
         # ------------------------------------------------
-        # Need to be careufl here, in some ricc2 calcs (opts?) this line will appear even
-        # though we already have this MP2 energy from the above section.
-        if not hasattr(self, "mpenergies"):
-            if "Method          :  MP2" in line:
-                line = next(inputfile)
-                mp2energy = [utils.convertor(utils.float(line.split()[3]), 'hartree', 'eV')]
-                self.append_attribute('mpenergies', mp2energy)
-                self.metadata['methods'].append("MP2")
+        if "Method          :  MP2" in line:
+            line = next(inputfile)
+            mp2energy = [utils.convertor(utils.float(line.split()[3]), 'hartree', 'eV')]
+            self.append_attribute('mpenergies', mp2energy)
+            self.metadata['methods'].append("MP2")
 
 
         # Excited state info from escf.
@@ -938,20 +886,6 @@ class Turbomole(logfileparser.Logfile):
         #       occ. orbital   energy / eV   virt. orbital     energy / eV   |coeff.|^2*100
         #         7 a   alpha          -15.12     12 a   alpha            4.74       24.5
         #         7 a   beta           -15.12     12 a   beta             4.74       24.5        
-        # metadata for RPA
-        if "RPA SINGLET-EXCITATION-CALCULATION" in line:
-            self.metadata['methods'].append("Restricted TD")
-        if "RPA UHF-EXCITATION-CALCULATION" in line:
-            self.metadata['methods'].append("Unrestricted TD")
-        # metadata for TPA
-        if "TWO-PHOTON ABSORPTION AMPLITUDES REQUESTED" in line:
-            self.metadata['methods'].append("QR-TPA")
-        # metadata for dft
-        if "density functional" in line and "------------------" in self.last_lines[-1]:
-            line = next(inputfile)
-            line = next(inputfile)
-            self.metadata['functional'] = line.split()[0].upper()
-
         if "Excitation energy:" in line and "excitation" in self.last_lines[-5].split():
             # The irrep of the state is a few lines back.
             symm_parts = self.last_lines[-5].split()
@@ -962,7 +896,7 @@ class Turbomole(logfileparser.Logfile):
             else:
                 mult = symm_parts[1].capitalize()
             
-            symmetry = f"{mult}-{symm_parts[-2].capitalize()}"
+            symmetry = "{}-{}".format(mult, symm_parts[-2].capitalize())
             self.append_attribute("etsyms", symmetry)
             
             # Energy should be in cm-1...
@@ -1054,25 +988,6 @@ class Turbomole(logfileparser.Logfile):
             
             self.append_attribute("etdips", [tdm_x, tdm_y, tdm_z])
             
-            # Mag dips.
-            while "Magnetic transition dipole moment / i:" not in line:
-                line = next(inputfile)
-            line = next(inputfile)
-            
-            line = next(inputfile)
-            tmdm_x = float(line.split()[1])
-            line = next(inputfile)
-            tmdm_y = float(line.split()[1])
-            line = next(inputfile)
-            tmdm_z = float(line.split()[1])
-            
-            # The Turbomole TEDM units are equivalent to bohr-magneton * 0.5a,
-            # where a is the fine structure constant (~ 1/137) (Thanks to Uwe Huniar for this info).
-            # Weirdly, this conversion does not seem to exactly match the bohr-magneton value
-            # printed by turbomole...
-            self.append_attribute("etmagdips", [i / (0.5 * scipy.constants.alpha) for i in (tmdm_x, tmdm_y, tmdm_z)])
-            
-            
         # Excitation energies with ricc2.
         #  +================================================================================+
         #  | sym | multi | state |          CC2 excitation energies       |  %t1   |  %t2   |
@@ -1118,7 +1033,7 @@ class Turbomole(logfileparser.Logfile):
                 else:
                     mult = parts[2]
                     
-                symmetry = f"{mult}-{parts[1].capitalize()}"
+                symmetry = "{}-{}".format(mult, parts[1].capitalize())
                 self.append_attribute("etsyms", symmetry)
                     
                 energy = utils.float(parts[6])
@@ -1396,15 +1311,16 @@ class OldTurbomole(logfileparser.Logfile):
     """A Turbomole output file. Code is outdated and is not being used."""
 
     def __init__(self, *args):
-        super().__init__(logname="Turbomole", *args)
+        # Call the __init__ method of the superclass
+        super(Turbomole, self).__init__(logname="Turbomole", *args)
         
     def __str__(self):
         """Return a string representation of the object."""
-        return f"Turbomole output file {self.filename}"
+        return "Turbomole output file %s" % (self.filename)
 
     def __repr__(self):
         """Return a representation of the object."""
-        return f'Turbomole("{self.filename}")'
+        return 'Turbomole("%s")' % (self.filename)
 
     def atlist(self, atstr):
         # turn atstr from atoms section into array
@@ -1626,89 +1542,64 @@ class OldTurbomole(logfileparser.Logfile):
                             d_counter=6
                             
                         for j in range(0, len(basis.symmetries), 1):
-                            if basis.symmetries[j] == "s":
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(s_counter)}{'S'}"
-                                )
-                                s_counter = s_counter + 1
-                            elif basis.symmetries[j] == "p":
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(p_counter)}{'PX'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(p_counter)}{'PY'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(p_counter)}{'PZ'}"
-                                )
-                                p_counter = p_counter + 1
-                            elif basis.symmetries[j] == "d":
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(d_counter)}{'D 0'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(d_counter)}{'D+1'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(d_counter)}{'D-1'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(d_counter)}{'D+2'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(d_counter)}{'D-2'}"
-                                )
-                                d_counter = d_counter + 1
-                            elif basis.symmetries[j] == "f":
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F 0'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F+1'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F-1'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F+2'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F-2'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F+3'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'F-3'}"
-                                )
-                            elif basis.symmetries[j] == "g":
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'G 0'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'G+1'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(f_counter)}{'G-1'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(g_counter)}{'G+2'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(g_counter)}{'G-2'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(g_counter)}{'G+3'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(g_counter)}{'G-3'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(g_counter)}{'G+4'}"
-                                )
-                                self.aonames.append(
-                                    f"{pa}{int(counter)}_{int(g_counter)}{'G-4'}"
-                                )
+                            if basis.symmetries[j]=='s':
+                                self.aonames.append("%s%d_%d%s" % \
+                                              (pa, counter, s_counter, "S"))
+                                s_counter=s_counter+1
+                            elif basis.symmetries[j]=='p':
+                                self.aonames.append("%s%d_%d%s" % \
+                                              (pa, counter, p_counter, "PX"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                              (pa, counter, p_counter, "PY"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                              (pa, counter, p_counter, "PZ"))
+                                p_counter=p_counter+1
+                            elif basis.symmetries[j]=='d':
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, d_counter, "D 0"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, d_counter, "D+1"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, d_counter, "D-1"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, d_counter, "D+2"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, d_counter, "D-2"))
+                                d_counter=d_counter+1
+                            elif basis.symmetries[j]=='f':
+                                 self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "F 0"))
+                                 self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "F+1"))
+                                 self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "F-1"))
+                                 self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "F+2"))
+                                 self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "F-2"))
+                                 self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "F+3"))
+                                 self.aonames.append("%s%d_%d%s" % \
+                                        (pa, counter, f_counter, "F-3"))
+                            elif basis.symmetries[j]=='g':
+                                self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "G 0"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "G+1"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                       (pa, counter, f_counter, "G-1"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                        (pa, counter, g_counter, "G+2"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, g_counter, "G-2"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                         (pa, counter, g_counter, "G+3"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                          (pa, counter, g_counter, "G-3"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                          (pa, counter, g_counter, "G+4"))
+                                self.aonames.append("%s%d_%d%s" % \
+                                          (pa, counter, g_counter, "G-4"))
                         break
                 counter=counter+1
                 

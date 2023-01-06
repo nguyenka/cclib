@@ -44,10 +44,23 @@ class CJSON(filewriter.Writer):
 
         # These are properties that can be collected using Open Babel.
         if _has_openbabel:
-            cjson_dict['smiles'] = self.pbmol.write('smiles')
-            cjson_dict['inchi'] = self.pbmol.write('inchi')
-            cjson_dict['inchikey'] = self.pbmol.write('inchikey')
-            cjson_dict['formula'] = self.pbmol.formula
+            # avoid crashing with try: and  except: 
+            try:
+                cjson_dict['formula'] = self.pbmol.formula
+            except:
+                pass
+            try:
+                cjson_dict['smiles'] = self.pbmol.write('smiles')
+            except:
+                cjson_dict['smiles'] = 'NA'
+            try:
+                cjson_dict['inchikey'] = self.pbmol.write('inchikey')
+            except:
+                cjson_dict['inchikey'] = 'NA'
+            try:
+                cjson_dict['inchi'] = self.pbmol.write('inchi')
+            except:
+                cjson_dict['inchi'] = 'NA'
         # TODO Incorporate unit cell information.
 
         # Iterate through the attribute list present in ccData. Depending on

@@ -1,0 +1,18 @@
+pip install --user -e .
+Obtaining file:///Users/nguyenka/cclib
+Requirement already satisfied: packaging>=19.0 in /Users/nguyenka/opt/anaconda3/lib/python3.8/site-packages (from cclib==1.7.1) (20.9)
+Requirement already satisfied: numpy in /Users/nguyenka/opt/anaconda3/lib/python3.8/site-packages (from cclib==1.7.1) (1.20.1)
+Collecting periodictable
+  Downloading periodictable-1.6.0.tar.gz (686 kB)
+     |████████████████████████████████| 686 kB 1.6 MB/s 
+Requirement already satisfied: scipy>=1.2.0 in /Users/nguyenka/opt/anaconda3/lib/python3.8/site-packages (from cclib==1.7.1) (1.6.2)
+Requirement already satisfied: pyparsing>=2.0.2 in /Users/nguyenka/opt/anaconda3/lib/python3.8/site-packages (from packaging>=19.0->cclib==1.7.1) (2.4.7)
+Building wheels for collected packages: periodictable
+  Building wheel for periodictable (setup.py) ... done
+  Created wheel for periodictable: filename=periodictable-1.6.0-py3-none-any.whl size=749730 sha256=a1481066295faf6d5182740c13c6e5ac3a7e1a4fadf044d9ff14fba10accb8e8
+  Stored in directory: /Users/nguyenka/Library/Caches/pip/wheels/42/fd/65/8cacc08d4786953b91cf2c8d5f309a1cc1039c2bf1727390a1
+Successfully built periodictable
+Installing collected packages: periodictable, cclib
+  Running setup.py develop for cclib
+Successfully installed cclib periodictable-1.6.0
+
